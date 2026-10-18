@@ -179,7 +179,7 @@ function draw(){
 }
 function leaveIntro(){
   const it=SS.intro;const spent=performance.now()-it.t;
-  SS.records.push({kind:'intro',entryId:null,tag:'자기소개',q:'자기소개',a:'',f:'',status:it.slot.blob?'answered':'skipped',spentMs:spent,recMs:it.slot.recMs||0,blob:it.slot.blob||null});
+  SS.records.push({kind:'intro',entryId:null,tag:'자기소개',q:'자기소개',a:(S.intro.main||''),f:'',status:it.slot.blob?'answered':'skipped',spentMs:spent,recMs:it.slot.recMs||0,blob:it.slot.blob||null});
 }
 function askEnd(){
   IV.modal({title:'면접을 종료할까요?',body:'지금까지의 답변으로 리포트를 만들어요.',ok:'종료',cancel:'계속하기',danger:true,onOk:endSession});
@@ -189,7 +189,7 @@ async function endSession(){
   if(SS.phase==='intro')leaveIntro();else finalizeRound();
   const total=performance.now()-SS.t0;
   const answered=SS.records.filter(r=>r.blob||r.status!=='skipped'||r.kind==='q');
-  const rep={id:'r'+Date.now(),createdAt:Date.now(),totalMs:total,rating:0,imps:SS.imps,records:SS.records};
+  const rep={id:'r'+Date.now(),createdAt:Date.now(),totalMs:total,rating:0,updatedAt:Date.now(),imps:SS.imps,records:SS.records};
   clearInterval(tickT);SS=null;sess.hidden=true;IV.clear(sess);document.body.style.overflow='';
   if(!rep.records.length){IV.toast('답변한 질문이 없어서 리포트를 만들지 않았어요.');IV.V.mock.view='setup';IV.render();return}
   try{await IV.reports.put(rep)}catch(e){IV.toast('리포트를 저장하지 못했어요.')}
@@ -199,7 +199,7 @@ async function endSession(){
 /* ---------- 리포트 ---------- */
 function stars(rep,onChange){
   const w=h('div',{class:'stars',role:'group','aria-label':'만족도'});
-  function paint(){IV.clear(w);for(let i=1;i<=5;i++)w.append(h('button',{type:'button',class:i<=rep.rating?'on':'','aria-label':`만족도 ${i}점`,'aria-pressed':i<=rep.rating,on:{click:async ev=>{ev.stopPropagation();rep.rating=rep.rating===i?0:i;paint();await IV.reports.put(rep);onChange&&onChange()}}},'★'))}
+  function paint(){IV.clear(w);for(let i=1;i<=5;i++)w.append(h('button',{type:'button',class:i<=rep.rating?'on':'','aria-label':`만족도 ${i}점`,'aria-pressed':i<=rep.rating,on:{click:async ev=>{ev.stopPropagation();rep.rating=rep.rating===i?0:i;rep.updatedAt=Date.now();paint();await IV.reports.put(rep);IV.sync.schedule();onChange&&onChange()}}},'★'))}
   paint();return w;
 }
 const STX={answered:'답변함',gaveup:'답변 포기',skipped:'넘김'};
@@ -218,7 +218,7 @@ async function reportList(main,V){
           h('div',{class:'muted small'},`총 ${IV.fmt(rep.totalMs)} · ${rep.records.length}문항`),
           h('div',{class:'stat'},(rep.videos&&rep.videos.length)?h('span',{class:'st'},'영상 '+rep.videos.length):null,c.answered?h('span',{class:'st answered'},'답변 '+c.answered):null,c.gaveup?h('span',{class:'st gaveup'},'포기 '+c.gaveup):null,c.skipped?h('span',{class:'st skipped'},'넘김 '+c.skipped):null)),
         stars(rep),
-        h('button',{class:'btn sm danger',type:'button',on:{click:()=>IV.modal({title:'리포트를 삭제할까요?',body:IV.fmtDate(rep.createdAt),ok:'삭제',danger:true,onOk:async()=>{await IV.reports.del(rep.id);IV.render()}})}},'삭제')));
+        h('button',{class:'btn sm danger',type:'button',on:{click:()=>IV.modal({title:'리포트를 삭제할까요?',body:IV.fmtDate(rep.createdAt),ok:'삭제',danger:true,onOk:async()=>{await IV.reports.del(rep.id);await IV.sync.deleteReport(rep.id);IV.render()}})}},'삭제')));
     box.append(card);
   });
 }
@@ -246,12 +246,12 @@ async function reportDetail(main,V){
       IV.leaf('div',r.q,key+'q','qq'),
       h('div',{class:'times'},h('span',null,'질문에 머문 시간 '+IV.fmt(r.spentMs)),r.blob?h('span',null,'녹음 길이 '+IV.fmt(r.recMs)):null));
     if(r.blob){const u=URL.createObjectURL(r.blob);urls.push(u);card.append(h('audio',{controls:true,src:u,preload:'metadata','aria-label':`${i+1}번 답변 녹음`}))}
-    else card.append(h('p',{class:'muted small',style:'margin:6px 0'},r.status==='gaveup'?'답변을 포기했어요.':'녹음이 없어요.'));
+    else card.append(h('p',{class:'muted small',style:'margin:6px 0'},r.status==='gaveup'?'답변을 포기했어요.':(r.hadAudio?'다른 기기에서 녹음한 파일이라 이 기기에서는 재생할 수 없어요.':'녹음이 없어요.')));
     if(r.a||r.f){
-      const ans=h('div',{class:'ans'},h('p',{class:'k'},'모범답변 (답변 방향)'),r.a?IV.leaf('p',r.a,key+'a'):null);
+      const ans=h('div',{class:'ans'},h('p',{class:'k'},r.kind==='intro'?'내가 쓴 자기소개':'모범답변 (답변 방향)'),r.a?IV.leaf('p',r.a,key+'a'):null);
       if(r.f)ans.append(h('p',{class:'k',style:'margin-top:8px'},'꼬리질문 대비 포인트'),IV.leaf('p',r.f,key+'f'));
       card.append(ans);
-    }else if(r.kind==='intro')card.append(h('p',{class:'muted small'},'자기소개는 모범답변이 없어요. 녹음을 들으며 직접 점검해 보세요.'));
+    }else if(r.kind==='intro')card.append(h('p',{class:'muted small'},'자기소개 메뉴에 글을 쓰면 여기에 함께 보여요.'));
     scope.append(card);
   });
   wrap.append(scope);

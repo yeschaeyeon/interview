@@ -42,10 +42,13 @@ IV.modal=function({title,body,ok='확인',cancel='취소',danger=false,onOk}){
 
 /* ---------- 상태 저장 (localStorage) ---------- */
 const LS='iv.state.v1';
-const S=IV.S={imp:{},src:{},hl:{},done:{}};
-try{const o=JSON.parse(localStorage.getItem(LS)||'{}');for(const k of['imp','src','hl','done'])if(o[k])S[k]=o[k]}catch(e){}
+const SECS=['imp','src','hl','done','intro','notes','ridx'];
+const S=IV.S={imp:{},src:{},hl:{},done:{},intro:{},notes:{},ridx:{},ts:{}};
+try{const o=JSON.parse(localStorage.getItem(LS)||'{}');for(const k of[...SECS,'ts'])if(o[k])S[k]=o[k]}catch(e){}
 let st;
 IV.save=()=>{clearTimeout(st);st=setTimeout(()=>{try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}},120)};
+IV.SECS=SECS;
+IV.touch=(sec,key)=>{S.ts[sec+'|'+key]=Date.now();IV.save();if(IV.sync)IV.sync.schedule()};
 IV.imp=e=>S.imp[e.id]||2;
 IV.getSrc=e=>(S.src[e.id]!=null?S.src[e.id]:(IV.SRC[e.id]||''));
 const PAL=['g','y','p','b','c','r'];
@@ -115,7 +118,7 @@ function eraseHL(key,s,e,silent){
   }
   if(out.length)S.hl[key]=out;else delete S.hl[key];
 }
-IV.clearHLPrefix=p=>{for(const k of Object.keys(S.hl))if(k.startsWith(p))delete S.hl[k];IV.save()};
+IV.clearHLPrefix=p=>{for(const k of Object.keys(S.hl))if(k.startsWith(p)){delete S.hl[k];S.ts['hl|'+k]=Date.now()}IV.save();if(IV.sync)IV.sync.schedule()};
 
 const tb=document.getElementById('hltb');
 let pending=null;
@@ -141,10 +144,11 @@ function applyPending(c){
   for(const {leaf,s,e,whole} of pending){
     const key=leaf.dataset.hk;
     if(c)addHL(key,s,e,c);else eraseHL(key,s,e);
+    S.ts['hl|'+key]=Date.now();
     touched.add(leaf);
   }
   touched.forEach(l=>IV.paint(l,l._text,l.dataset.hk,l._opt));
-  IV.save();
+  IV.touch('hl',[...touched][0].dataset.hk);
   const sel=getSelection();sel&&sel.removeAllRanges();
   hideTb();
 }

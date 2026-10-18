@@ -3,7 +3,7 @@
 'use strict';
 const IV=window.IV,h=IV.h,D=IV.DATA,S=IV.S;
 const main=document.getElementById('main');
-const V=IV.V={tab:'mat',mat:{view:'home',grade:1,subject:'',eid:null,rtab:'mat',pane:'mat',mask:false},refs:{g:0,k:'전체',q:''},mock:{view:'setup',rid:null}};
+const V=IV.V={tab:'mat',mat:{view:'home',grade:1,subject:'',eid:null,rtab:'mat',pane:'mat',mask:false},refs:{g:0,k:'전체',q:''},mock:{view:'setup',rid:null},guide:{view:'list',id:null}};
 const GROUPS=[['창체','창의적 체험활동'],['교과','교과 · 학교자율과정']];
 const IMPTXT={1:'낮음',2:'보통',3:'높음'};
 const impDots=n=>h('span',{class:'imp','data-v':n,title:'중요도 '+n},h('i'),h('i'),h('i'));
@@ -11,13 +11,12 @@ const mark=(txt,sub)=>h('span',{class:'mk mk-'+IV.subjColor(sub)},txt);
 const chevron=()=>h('span',{class:'chev','aria-hidden':'true'},'›');
 
 IV.render=function render(){
-  const nm=document.getElementById('nav-mat'),nk=document.getElementById('nav-mock');
-  nm.setAttribute('aria-current',V.tab==='mat'?'page':'false');nk.setAttribute('aria-current',V.tab==='mock'?'page':'false');
-  main.classList.remove('fill');IV.clear(main);main.scrollTop=0;
+    main.classList.remove('fill');IV.clear(main);main.scrollTop=0;
   if(IV.releaseAudio)IV.releaseAudio();
-  if(V.tab==='mat')renderMat();else IV.renderMock(main,V);
+  if(V.tab==='mat')renderMat();else if(V.tab==='guide')IV.renderGuide(main,V);else IV.renderMock(main,V);
 };
 document.getElementById('nav-mat').addEventListener('click',()=>{if(V.tab==='mat'&&V.mat.view==='home')return;V.tab='mat';V.mat.view='home';IV.render()});
+document.getElementById('nav-guide').addEventListener('click',()=>{if(V.tab==='guide'&&V.guide.view==='list')return;V.tab='guide';V.guide.view='list';IV.render()});
 document.getElementById('nav-mock').addEventListener('click',()=>{if(V.tab==='mock'&&V.mock.view==='setup')return;V.tab='mock';V.mock.view='setup';IV.render()});
 
 function topbar(title,onBack,right){
@@ -30,6 +29,8 @@ function renderMat(){
   if(M.view==='grade')return matGrade();
   if(M.view==='subject')return matSubject();
   if(M.view==='refs')return refLibrary();
+  if(M.view==='intro')return introView();
+  if(M.view==='sync')return syncView();
 }
 
 /* ---------- 홈 ---------- */
@@ -46,7 +47,12 @@ function matHome(){
   const nref=refIndex().length;
   tiles.append(h('button',{class:'tile ref',type:'button',on:{click:()=>{V.mat.view='refs';IV.render()}}},
     h('span',{class:'big'},'참고자료'),h('span',{class:'sub'},'책 · 논문 · 기사 등 생기부에 들어간 자료'),h('span',{class:'sub'},`${nref}건`)));
+  tiles.append(h('button',{class:'tile',type:'button',on:{click:()=>{V.mat.view='intro';IV.render()}}},
+    h('span',{class:'big'},'자기소개'),h('span',{class:'sub'},'면접 첫 질문 · 직접 쓰고 외우기'),h('span',{class:'sub'},(S.intro.main||'').trim()?`${(S.intro.main||'').replace(/\s/g,'').length}자 작성됨`:'아직 작성 전')));
   wrap.append(tiles);
+  const sy=IV.sync;
+  wrap.append(h('div',{class:'group-h'},'기기 동기화'),h('button',{class:'row',type:'button',style:'border:var(--bd)',on:{click:()=>{V.mat.view='sync';IV.render()}}},
+    h('span',{class:'t'},sy.enabled()?'동기화 켜짐':'동기화 설정',h('small',null,sy.enabled()?(sy.st.last?'마지막 동기화 '+IV.fmtDate(sy.st.last):'아직 동기화 전'):'다른 기기에서도 하이라이트·원문·리포트를 이어서 쓰려면 설정하세요')),h('span',{class:'chev'},'›')));
   main.append(wrap);
 }
 
@@ -110,8 +116,8 @@ function matSubject(){
     bar.append(chips);
   }
   const imps=h('div',{class:'seg imps',role:'group','aria-label':'중요도'});
-  [1,2,3].forEach(v=>imps.append(h('button',{type:'button',dataset:{v},'aria-pressed':IV.imp(e)===v,title:'중요도 '+v+' ('+IMPTXT[v]+')',on:{click:()=>{S.imp[e.id]=v;IV.save();[...imps.children].forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===v)))}}},'중요도 '+v)));
-  const doneBtn=h('button',{class:'btn sm',type:'button','aria-pressed':IV.isDone(e),on:{click:()=>{if(IV.isDone(e))delete S.done[e.id];else S.done[e.id]=true;IV.save();IV.render()}}},IV.isDone(e)?'완료 취소':'완료 표시');
+  [1,2,3].forEach(v=>imps.append(h('button',{type:'button',dataset:{v},'aria-pressed':IV.imp(e)===v,title:'중요도 '+v+' ('+IMPTXT[v]+')',on:{click:()=>{S.imp[e.id]=v;IV.touch('imp',e.id);[...imps.children].forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===v)))}}},'중요도 '+v)));
+  const doneBtn=h('button',{class:'btn sm',type:'button','aria-pressed':IV.isDone(e),on:{click:()=>{if(IV.isDone(e))delete S.done[e.id];else S.done[e.id]=true;IV.touch('done',e.id);IV.render()}}},IV.isDone(e)?'완료 취소':'완료 표시');
   bar.append(h('span',{class:'muted small'},'면접에서 나올 가능성이 높을수록 3'),imps,doneBtn);
   head.append(bar);
   const ttl=(e.activity||e.subject)+(e.subtitle.length?' — '+e.subtitle.join(' / '):'');
@@ -150,7 +156,7 @@ function srcPane(e){
     body.append(h('h3',{class:'ph'},'생기부 원문 입력'),ta,h('div',{style:'display:flex;gap:8px;margin-top:10px'},
       h('button',{class:'btn primary',type:'button',on:{click:()=>{
         const v=ta.value.trim();if(v!==IV.getSrc(e).trim())IV.clearHLPrefix(e.id+':src');
-        S.src[e.id]=v;IV.save();view();IV.toast('원문을 저장했어요')}}},'저장'),
+        S.src[e.id]=v;IV.touch('src',e.id);view();IV.toast('원문을 저장했어요')}}},'저장'),
       h('button',{class:'btn',type:'button',on:{click:view}},'취소')));
     ta.focus();
   }
@@ -269,5 +275,101 @@ function refLibrary(){
   drawList();main.append(wrap);
 }
 
+IV.renderBlocks=renderBlocks;
+
+/* ---------- 자기소개 ---------- */
+function introView(){
+  const M=V.mat,wrap=h('div',{class:'wrap'});
+  wrap.append(topbar('자기소개',()=>{M.view='home';IV.render()}));
+  const box=h('div',{class:'panel hl-scope'});
+  function view(){
+    IV.clear(box);
+    const t=(S.intro.main||'').trim();
+    if(t){
+      const n=t.replace(/\s/g,'').length;
+      box.append(h('p',{class:'muted small',style:'margin:0 0 10px'},`${n}자 · 말하기 약 ${IV.fmt(n/5*1000)}`));
+      const body=h('div',{class:'src'});
+      t.split(/\n+/).filter(x=>x.trim()).forEach((p,i)=>body.append(IV.leaf('p',p.trim(),`intro:${i}`)));
+      box.append(body,h('button',{class:'btn sm',type:'button',on:{click:edit}},'수정'));
+    }else{
+      box.append(h('div',{class:'callout'},h('b',null,'자기소개를 써 보세요'),h('span',{class:'muted'},'모의면접의 첫 화면이 자기소개예요. 여기 쓴 글은 리포트에서 모범답변으로 같이 보여요.')),
+        h('p',{class:'muted small'},'구성 예시'),
+        h('p',{class:'muted',style:'margin:0 0 12px;white-space:pre-line'},'① 한 줄 소개와 지원 동기\n② 진로를 탐색한 핵심 활동\n③ 그 활동에서 배운 점\n④ 대학에서의 포부'),
+        h('button',{class:'btn primary',type:'button',on:{click:edit}},'쓰기'));
+    }
+  }
+  function edit(){
+    IV.clear(box);
+    const ta=h('textarea',{class:'src-edit',id:'intro-edit','aria-label':'자기소개',style:'min-height:50vh',value:S.intro.main||''});
+    const cnt=h('span',{class:'muted small'});
+    const upd=()=>{const n=ta.value.replace(/\s/g,'').length;cnt.textContent=`${n}자 · 말하기 약 ${IV.fmt(n/5*1000)}`};
+    ta.addEventListener('input',upd);
+    box.append(ta,h('div',{style:'display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap'},
+      h('button',{class:'btn primary',type:'button',on:{click:()=>{const v=ta.value.trim();if(v!==(S.intro.main||'').trim())IV.clearHLPrefix('intro:');if(v)S.intro.main=v;else delete S.intro.main;IV.touch('intro','main');view();IV.toast('저장했어요')}}},'저장'),
+      h('button',{class:'btn',type:'button',on:{click:view}},'취소'),cnt));
+    upd();ta.focus();
+  }
+  view();wrap.append(box);main.append(wrap);
+}
+
+/* ---------- 동기화 설정 ---------- */
+const RULES=`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /sync/{doc} {
+      allow get, create, update, delete: if true;
+    }
+  }
+}`;
+function copy(txt,msg){try{navigator.clipboard.writeText(txt).then(()=>IV.toast(msg||'복사했어요'),()=>IV.toast('복사하지 못했어요. 직접 선택해서 복사해 주세요.'))}catch(e){IV.toast('복사하지 못했어요. 직접 선택해서 복사해 주세요.')}}
+function syncView(){
+  const M=V.mat,sy=IV.sync,wrap=h('div',{class:'wrap'});
+  wrap.append(topbar('기기 동기화',()=>{M.view='home';IV.render()}));
+  const stat=h('p',{id:'sync-status',class:'small',style:'margin:0 0 12px'});
+  function paintStat(st){
+    if(!document.body.contains(stat))return;
+    const t={off:'동기화가 꺼져 있어요.',idle:'연결됨',syncing:'동기화 중…',ok:'동기화 완료 · '+(st.last?IV.fmtDate(st.last):''),error:'동기화 실패'}[st.state]||'';
+    stat.textContent=t;stat.classList.toggle('err',st.state==='error');
+    if(st.state==='error'&&st.msg)stat.append(h('br'),st.msg);
+  }
+  sy.on(paintStat);
+  const kI=h('input',{class:'search',id:'sy-k',placeholder:'apiKey (AIza로 시작)',value:sy.cfg.k||'','aria-label':'apiKey',autocomplete:'off'});
+  const pI=h('input',{class:'search',id:'sy-p',placeholder:'projectId',value:sy.cfg.p||'','aria-label':'projectId',autocomplete:'off'});
+  const cI=h('input',{class:'search',id:'sy-c',placeholder:'동기화 코드',value:sy.cfg.c||'','aria-label':'동기화 코드',autocomplete:'off'});
+  const pk=h('input',{class:'search',id:'sy-pack',placeholder:'다른 기기에서 복사한 연결 정보 붙여넣기','aria-label':'연결 정보',autocomplete:'off'});
+  const connect=()=>{
+    const k=kI.value.trim(),p=pI.value.trim(),c=cI.value.trim().replace(/[^A-Za-z0-9]/g,'');
+    if(!k||!p||!c){IV.toast('apiKey, projectId, 동기화 코드를 모두 입력해 주세요.');return}
+    sy.setCfg({k,p,c});IV.toast('연결했어요. 동기화를 시작해요.');sy.run(true);sy.init();paintStat(sy.st);
+  };
+  wrap.append(h('div',{class:'panel'},h('h2',null,'상태'),stat,
+    h('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},
+      h('button',{class:'btn primary',type:'button',disabled:!sy.enabled(),on:{click:()=>sy.run(true)}},'지금 동기화'),
+      h('button',{class:'btn',type:'button',disabled:!sy.enabled(),on:{click:()=>copy(sy.pack(),'연결 정보를 복사했어요. 다른 기기에 붙여넣으세요.')}},'연결 정보 복사'),
+      h('button',{class:'btn danger',type:'button',disabled:!sy.enabled(),on:{click:()=>IV.modal({title:'동기화를 끌까요?',body:'이 기기의 데이터는 그대로 남아요.',ok:'끄기',danger:true,onOk:()=>{sy.clear();IV.render()}})}},'연결 해제'))));
+  wrap.append(h('div',{class:'panel'},h('h2',null,'이미 다른 기기에서 설정했다면'),
+    h('p',{class:'muted small',style:'margin:0 0 8px'},'그 기기의 "연결 정보 복사"로 복사한 값을 붙여넣으세요.'),pk,
+    h('button',{class:'btn',type:'button',style:'margin-top:8px',on:{click:()=>{try{const o=sy.unpack(pk.value);kI.value=o.k;pI.value=o.p;cI.value=o.c;connect()}catch(e){IV.toast('연결 정보를 읽을 수 없어요. 다시 복사해 주세요.')}}}},'적용')));
+  const steps=[
+   ['Firebase 프로젝트 만들기','console.firebase.google.com 에서 "프로젝트 추가"를 누르고 이름을 정해요. Google 애널리틱스는 꺼도 돼요.'],
+   ['Firestore 만들기','왼쪽 메뉴 빌드 → Firestore Database → 데이터베이스 만들기. 위치는 asia-northeast3(서울)을 고르고, 모드는 프로덕션 모드로 시작해요.'],
+   ['규칙 게시','Firestore의 "규칙" 탭에 아래 내용을 통째로 붙여넣고 "게시"를 눌러요.'],
+   ['웹 앱 등록','프로젝트 설정(톱니바퀴) → 일반 → 내 앱 → 웹(</>) 앱을 등록하면 firebaseConfig가 나와요. 그중 apiKey와 projectId를 아래에 입력해요.'],
+   ['동기화 코드','"새 코드 만들기"를 누르거나 직접 정해요. 이 코드를 아는 기기만 같은 데이터를 읽고 써요. 다른 사람에게 알려주지 마세요.']];
+  wrap.append(h('div',{class:'panel'},h('h2',null,'설정 방법'),
+    ...steps.map((st,i)=>h('div',{class:'use',style:i?'':'border-top:0;margin-top:0;padding-top:0'},h('b',null,`${'①②③④⑤'[i]} ${st[0]}`),h('p',{class:'muted small'},st[1]))),
+    h('pre',{style:'border:1px solid var(--line);background:var(--faint);padding:10px;overflow:auto;font-size:12.5px;margin:8px 0'},RULES),
+    h('button',{class:'btn sm',type:'button',on:{click:()=>copy(RULES,'규칙을 복사했어요')}},'규칙 복사')));
+  wrap.append(h('div',{class:'panel'},h('h2',null,'연결 입력'),
+    h('div',{style:'display:flex;flex-direction:column;gap:8px'},kI,pI,cI),
+    h('div',{style:'display:flex;gap:8px;margin-top:10px;flex-wrap:wrap'},
+      h('button',{class:'btn',type:'button',on:{click:()=>{cI.value=sy.makeCode()}}},'새 코드 만들기'),
+      h('button',{class:'btn primary',type:'button',on:{click:connect}},'연결하고 동기화'))));
+  wrap.append(h('div',{class:'panel'},h('h2',null,'동기화되는 것'),
+    h('p',{style:'margin:0;white-space:pre-line'},'① 하이라이트, 중요도, 완료 표시, 생기부 원문, 자기소개, 가이드 메모\n② 모의면접 리포트(질문, 시간, 별점)\n③ 녹음과 첨부 영상은 용량 때문에 동기화되지 않고, 녹음한 기기에서만 재생돼요.')));
+  paintStat(sy.st);main.append(wrap);
+}
+
 IV.render();
+IV.sync.init();
 })();
