@@ -85,6 +85,10 @@ function renderBlocks(blocks,scope,pfx){
   blocks.forEach((b,i)=>{
     if(b.t==='p'){
       f.append(b.h?IV.leaf('h4',b.text,`${scope}:${pfx}p${i}`,'sub'):IV.leaf('p',b.text,`${scope}:${pfx}p${i}`,'',{label:true}));
+    }else if(b.t==='code'){
+      f.append(h('pre',{class:'code'},b.x));
+    }else if(b.t==='tip'){
+      f.append(h('div',{class:'callout tip'},IV.leaf('p','면접 포인트: '+b.x,`${scope}:${pfx}p${i}`,'',{label:true})));
     }else{
       const t=h('table');const rows=b.rows;
       const th=h('thead');const hr=h('tr');rows[0].forEach((c,ci)=>hr.append(IV.leaf('th',c,`${scope}:${pfx}t${i}r0c${ci}`)));th.append(hr);t.append(th);

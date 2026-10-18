@@ -130,8 +130,278 @@ window.GUIDE=[
  ]}
  ]}
 ];
-window.APPENDIX=[
-{id:'prog',name:'프로그래밍 특별 부록',desc:'IT·컴퓨터 계열 면접 대비. 내용은 준비되는 대로 이 아래 메모에 채워 넣어요.',
- secs:[{t:'참고: 컴퓨터 계열 기출 질문',b:[
-  {t:'table',rows:[['대학','학과','질문'],['숭실대학교','IT대학 컴퓨터학부','동아리활동으로 만든 앱은 프론트엔드와 백엔드 중 어떠한 것으로 구성했는지 설명해 보세요.']]}]}]}
-];
+window.APPENDIX=[{
+ "id": "prog",
+ "name": "파이썬 특별 부록 — 기술대학 면접 완전 대비",
+ "desc": "기술 관련 질문 비중이 높은 면접을 위해, 디지털캠프 활동의 파이썬 과정을 코드 단위까지 쪼개서 정리했습니다. 예시 코드는 실제로 작성했을 법한 전형적인 코드 형태이며, 실제 본인이 짠 코드와 문법이나 순서가 다를 수 있으니 맞춰서 확인해보는 용도로 활용하면 됩니다. 핵심은 \"왜 그 단계가 필요했는지\"를 본인 말로 설명할 수 있게 되는 것입니다.",
+ "secs": [
+  {
+   "t": "① 전체 파이프라인 한눈에 보기",
+   "b": [
+    {
+     "t": "code",
+     "x": "데이터 수집(Kaggle)\n  → pandas 전처리(결측치·형식오류 정리)\n  → 파생 변수 생성\n  → StandardScaler 표준화\n  → K-means 군집화 → 시장 유형 분류\n  → 산점도 시각화\n  → [검증①] 의사결정 트리로 분류 기준 재확인\n  → [검증②] 선형회귀 + RMSE로 예측 오차 검증\n  → train/test split으로 전체 절차의 신뢰도 확보"
+    },
+    {
+     "t": "p",
+     "x": "이 흐름 자체를 면접 도입부에 한 문장으로 말할 수 있어야 합니다: \"국가별 시장 지표를 수집해 전처리하고, 표준화 후 군집화로 시장 유형을 나눈 다음, 그 분류가 타당한지 두 가지 다른 방식(의사결정 트리, 회귀분석)으로 교차 검증했습니다.\""
+    }
+   ]
+  },
+  {
+   "t": "② 데이터 수집",
+   "b": [
+    {
+     "t": "ul",
+     "x": [
+      "캐글(Kaggle)의 공개 데이터셋에서 국가별 시장 지표를 확보",
+      "파이썬에서는 보통 pandas.read_csv() 로 데이터를 불러옴"
+     ]
+    },
+    {
+     "t": "code",
+     "x": "import pandas as pd\ndf = pd.read_csv(\"market_data.csv\")\ndf.head()       # 상위 5개 행 확인\ndf.info()       # 컬럼별 데이터 타입, 결측치 개수 확인\ndf.describe()   # 수치형 컬럼의 평균/표준편차/최소최대 확인"
+    },
+    {
+     "t": "tip",
+     "x": "df.info() 와 df.describe() 를 먼저 실행해서 데이터를 파악하는 게 일반적인 순서라는 것 — \"무작정 모델부터 돌린 게 아니라 데이터를 먼저 이해하는 단계를 거쳤다\"고 말하면 좋은 인상을 줌"
+    }
+   ]
+  },
+  {
+   "t": "③ pandas 전처리 — 결측치·형식 오류 정리",
+   "b": [
+    {
+     "t": "h",
+     "x": "결측치 처리"
+    },
+    {
+     "t": "code",
+     "x": "df.isnull().sum()          # 컬럼별 결측치 개수 확인\ndf = df.dropna()           # 결측치가 있는 행 제거\n# 또는\ndf[\"gdp\"] = df[\"gdp\"].fillna(df[\"gdp\"].mean())   # 평균값으로 채우기"
+    },
+    {
+     "t": "p",
+     "x": "왜 dropna가 아니라 fillna를 쓸 수도 있는지: 결측치가 있는 행을 아예 지우면(dropna) 데이터가 너무 많이 줄어들 수 있음 → 국가 수 자체가 적은 데이터라면 평균이나 중앙값으로 채우는(fillna) 게 더 합리적일 수 있음. 실제로 어떤 방식을 썼는지, 왜 그 방식을 골랐는지가 핵심 질문 포인트"
+    },
+    {
+     "t": "h",
+     "x": "형식 오류 정리"
+    },
+    {
+     "t": "code",
+     "x": "df[\"gdp\"] = df[\"gdp\"].astype(float)           # 문자열로 잘못 들어온 숫자를 실수형으로 변환\ndf[\"country\"] = df[\"country\"].str.strip()    # 국가명에 불필요한 공백 제거"
+    },
+    {
+     "t": "tip",
+     "x": "\"국가별로 데이터를 수집·기재하는 기관이 다르기 때문에 콤마가 섞인 숫자, 공백, 단위 표기가 제각각이라 이를 통일하는 작업이 필요했다\"는 식으로 왜 전처리가 필요했는지를 데이터의 특성과 연결해서 설명하면 훨씬 설득력 있음"
+    }
+   ]
+  },
+  {
+   "t": "④ 파생 변수 생성",
+   "b": [
+    {
+     "t": "ul",
+     "x": [
+      "원본 지표를 그대로 쓰지 않고, 분석 목적(표준화 vs 현지화 판단)에 맞는 새로운 지표를 직접 계산해서 만듦",
+      "예: 1인당 GDP, 인터넷 보급률 대비 소비지출 비율 같은 파생 지표"
+     ]
+    },
+    {
+     "t": "code",
+     "x": "df[\"gdp_per_capita\"] = df[\"gdp\"] / df[\"population\"]"
+    },
+    {
+     "t": "tip",
+     "x": "이 부분이 사실 가장 \"본인의 분석적 판단\"이 들어가는 지점입니다. 어떤 파생 변수를 왜 만들었는지 — 즉 표준화 전략과 현지화 전략을 가를 수 있는 지표가 뭐라고 생각했는지를 설명할 수 있어야 함. 【실제로 만든 파생 변수가 있다면 채워 넣기】"
+    }
+   ]
+  },
+  {
+   "t": "⑤ StandardScaler — 표준화",
+   "b": [
+    {
+     "t": "h",
+     "x": "개념"
+    },
+    {
+     "t": "ul",
+     "x": [
+      "공식: (x - 평균) / 표준편차",
+      "모든 변수를 평균 0, 표준편차 1 기준으로 변환"
+     ]
+    },
+    {
+     "t": "code",
+     "x": "from sklearn.preprocessing import StandardScaler\nscaler = StandardScaler()\nscaled_data = scaler.fit_transform(df[[\"gdp_per_capita\", \"internet_penetration\", \"consumption\"]])\nprint(scaled_data.mean(axis=0))   # 표준화 후 평균 ≈ 0 확인\nprint(scaled_data.std(axis=0))    # 표준화 후 표준편차 ≈ 1 확인"
+    },
+    {
+     "t": "h",
+     "x": "왜 필요한가 (면접 필수 답변)"
+    },
+    {
+     "t": "ul",
+     "x": [
+      "GDP는 수백~수천 단위, 인터넷 보급률은 0~100% 단위처럼 지표마다 스케일이 다름",
+      "거리 기반 알고리즘(K-means)이나 회귀 모델은 값이 큰 변수에 더 큰 영향을 받기 때문에, 표준화 없이 돌리면 GDP 하나가 분석 결과를 지배해버림",
+      "fit_transform() 은 평균·표준편차를 계산(fit)하면서 동시에 변환(transform)까지 한 번에 처리하는 함수"
+     ]
+    },
+    {
+     "t": "h",
+     "x": "StandardScaler vs MinMaxScaler (심화 질문 대비)"
+    },
+    {
+     "t": "p",
+     "x": "MinMaxScaler는 값을 0~1 사이로 압축하는 방식이고, StandardScaler는 평균·표준편차 기준으로 변환하는 방식. StandardScaler를 선택한 이유를 물으면: \"이상치(극단적으로 GDP가 높은 국가 등)가 있을 수 있는 데이터라서, 이상치에 상대적으로 덜 민감한 표준화 방식을 택했다\" 같은 논리로 답하면 좋음"
+    }
+   ]
+  },
+  {
+   "t": "⑥ K-means 군집화",
+   "b": [
+    {
+     "t": "h",
+     "x": "알고리즘 원리 (단계별)"
+    },
+    {
+     "t": "ol",
+     "x": [
+      "K개의 중심점(centroid)을 임의로 초기 설정",
+      "모든 데이터(국가)를 가장 가까운 중심점 기준으로 그룹에 할당",
+      "각 그룹의 평균 위치로 중심점을 다시 계산(재배치)",
+      "중심점이 더 이상 변하지 않을 때까지 2~3번을 반복"
+     ]
+    },
+    {
+     "t": "code",
+     "x": "from sklearn.cluster import KMeans\nkmeans = KMeans(n_clusters=3, random_state=42)\ndf[\"cluster\"] = kmeans.fit_predict(scaled_data)\ndf.groupby(\"cluster\").mean()   # 군집별 평균 지표 비교"
+    },
+    {
+     "t": "h",
+     "x": "K값(군집 개수)은 어떻게 정했는가 (자주 나오는 질문)"
+    },
+    {
+     "t": "p",
+     "x": "대표적 방법: 엘보우 기법(Elbow Method) — K를 1부터 늘려가며 군집 내 분산(inertia)을 그래프로 그리면, 어느 지점부터 감소폭이 급격히 줄어드는(팔꿈치처럼 꺾이는) 지점이 나오는데 그 지점을 K로 선택"
+    },
+    {
+     "t": "code",
+     "x": "inertia = []\nfor k in range(1, 10):\n    km = KMeans(n_clusters=k, random_state=42).fit(scaled_data)\n    inertia.append(km.inertia_)"
+    },
+    {
+     "t": "tip",
+     "x": "【실제로 엘보우 기법을 썼는지, 아니면 임의로 K=3(예: 선진시장/신흥시장/저개발시장처럼 직관적으로 나눌 수 있는 개수)로 정했는지 확인 필요 — 못 썼다면 \"국가를 몇 개의 유형으로 나눌지는 마케팅 전략상 의미 있게 구분되는 수준(예: 3그룹)으로 정했다\"는 논리로 답변 가능】"
+    },
+    {
+     "t": "h",
+     "x": "시각화"
+    },
+    {
+     "t": "code",
+     "x": "import matplotlib.pyplot as plt\nplt.scatter(df[\"gdp_per_capita\"], df[\"internet_penetration\"], c=df[\"cluster\"])\nplt.show()"
+    }
+   ]
+  },
+  {
+   "t": "⑦ 검증① — 의사결정 트리(Decision Tree)",
+   "b": [
+    {
+     "t": "h",
+     "x": "개념"
+    },
+    {
+     "t": "ul",
+     "x": [
+      "데이터를 \"지표 A ≥ 기준값?\" 같은 조건으로 계속 쪼개면서 분류하는 모델",
+      "각 분기(node)에서 불순도(impurity)를 가장 많이 줄이는 조건을 선택 — 대표적으로 지니 계수(Gini) 또는 엔트로피(Entropy) 사용"
+     ]
+    },
+    {
+     "t": "code",
+     "x": "from sklearn.tree import DecisionTreeClassifier, plot_tree\ntree = DecisionTreeClassifier(max_depth=3, random_state=42)\ntree.fit(scaled_data, df[\"cluster\"])\nplot_tree(tree, feature_names=[\"gdp_per_capita\",\"internet_penetration\",\"consumption\"])"
+    },
+    {
+     "t": "h",
+     "x": "왜 K-means 다음에 의사결정 트리를 썼는가 (핵심 질문)"
+    },
+    {
+     "t": "ul",
+     "x": [
+      "K-means는 국가들을 그룹으로 나눠주지만 \"왜\" 그렇게 나뉘었는지는 설명해주지 않음 (블랙박스에 가까움)",
+      "의사결정 트리는 \"인터넷 보급률이 70% 이상이면 그룹 1\"처럼 사람이 읽을 수 있는 규칙으로 분류 기준을 보여줌",
+      "즉, K-means로 나눈 군집이 실제로 의미 있는 지표 기준으로 구분되는지를 검증하는 역할"
+     ]
+    },
+    {
+     "t": "h",
+     "x": "max_depth를 제한한 이유 (심화 질문)"
+    },
+    {
+     "t": "p",
+     "x": "트리 깊이를 제한하지 않으면 학습 데이터에 지나치게 딱 맞는(과적합된) 복잡한 트리가 만들어짐 → 해석 가능성도 떨어지고, 새로운 데이터에 일반화가 안 됨"
+    }
+   ]
+  },
+  {
+   "t": "⑧ 검증② — 선형 회귀 + RMSE",
+   "b": [
+    {
+     "t": "h",
+     "x": "개념"
+    },
+    {
+     "t": "code",
+     "x": "from sklearn.linear_model import LinearRegression\nfrom sklearn.metrics import mean_squared_error\nimport numpy as np\n\nmodel = LinearRegression()\nmodel.fit(X_train, y_train)\npred = model.predict(X_test)\nrmse = np.sqrt(mean_squared_error(y_test, pred))\nprint(rmse)"
+    },
+    {
+     "t": "ul",
+     "x": [
+      "RMSE(Root Mean Squared Error): 예측값과 실제값의 차이(오차)를 제곱해서 평균 낸 뒤, 다시 제곱근을 씌운 값",
+      "제곱을 하는 이유: 오차가 +든 -든 상관없이 크기만 반영하기 위해 (음수와 양수가 서로 상쇄되는 것을 방지)",
+      "제곱근을 다시 씌우는 이유: 오차의 단위를 원래 데이터의 단위로 되돌리기 위해 (MSE는 단위가 제곱이 되어 해석이 어려움)"
+     ]
+    },
+    {
+     "t": "h",
+     "x": "MSE, MAE와 비교 (심화 질문 대비)"
+    },
+    {
+     "t": "ul",
+     "x": [
+      "MAE(평균절대오차)는 오차의 절댓값 평균 — 이상치에 덜 민감함",
+      "RMSE는 오차를 제곱하기 때문에 큰 오차(이상치)에 더 민감하게 반응 — \"큰 오차를 더 엄격하게 잡아내고 싶어서 RMSE를 선택했다\"는 논리로 답변 가능"
+     ]
+    },
+    {
+     "t": "h",
+     "x": "이 활동에서 RMSE가 한 역할"
+    },
+    {
+     "t": "p",
+     "x": "군집화·의사결정 트리로 나눈 시장 유형 구분 기준이 회귀 예측 관점에서도 통계적으로 타당한지 오차 크기로 재점검"
+    }
+   ]
+  },
+  {
+   "t": "⑨ train/test split — 검증 절차의 원칙",
+   "b": [
+    {
+     "t": "code",
+     "x": "from sklearn.model_selection import train_test_split\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)"
+    },
+    {
+     "t": "ul",
+     "x": [
+      "데이터를 학습용(train)과 검증용(test)으로 나눠, 모델이 학습에 쓰지 않은 데이터에서도 잘 맞는지 확인",
+      "random_state 는 데이터를 나누는 방식을 고정해서, 다시 실행해도 같은 결과가 나오게 하는 값 (재현성 확보)"
+     ]
+    },
+    {
+     "t": "p",
+     "x": "왜 이게 중요한 원칙인가: 학습 데이터로만 평가하면 모델이 그 데이터를 \"외운\" 것인지, 진짜 패턴을 학습한 것인지 구분이 안 됨 → 이 활동을 통해 \"분석 결과의 신뢰도를 확보하려면 세운 가설을 끊임없이 검증해야 한다\"는 리스크 관리 원칙을 배웠다고 소감문에 직접 밝힌 부분과 연결됨"
+    }
+   ]
+  }
+ ]
+}];

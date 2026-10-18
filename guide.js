@@ -9,6 +9,8 @@ function conv(blocks){
     if(b.t==='p')out.push({t:'p',text:b.x});
     else if(b.t==='h')out.push({t:'p',text:b.x,h:1});
     else if(b.t==='ol')b.x.forEach((x,i)=>out.push({t:'p',text:CIRC[i]+' '+x}));
+    else if(b.t==='ul')b.x.forEach(x=>out.push({t:'p',text:x}));
+    else if(b.t==='code'||b.t==='tip')out.push(b);
     else if(b.t==='table')out.push({t:'table',rows:b.rows});
   });
   return out;

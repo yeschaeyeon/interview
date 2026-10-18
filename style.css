@@ -201,3 +201,6 @@ tr:last-child td{border-bottom:0} th:last-child,td:last-child{border-right:0}
   .split[data-pane="mat"] .pane-src{display:none}
   .pane{padding:16px}
 }
+
+pre.code{border:1px solid var(--line);background:var(--faint);padding:12px 14px;overflow-x:auto;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin:8px 0;white-space:pre;user-select:text}
+.callout.tip{border:1.5px solid var(--ink);background:#fff;margin:8px 0}
