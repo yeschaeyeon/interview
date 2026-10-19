@@ -39,7 +39,7 @@ IV.renderGuide=function(main,V){
   const G=V.guide,wrap=h('div',{class:'wrap'});main.append(wrap);
   const back=fn=>h('button',{class:'back',type:'button','aria-label':'뒤로',on:{click:fn}},'‹');
   if(G.view==='list'){
-    wrap.append(h('div',{class:'hello'},h('h2',null,'학종 가이드'),h('p',{class:'muted',style:'margin:0 0 16px'},'대학별 면접 평가 방식과 기출 질문을 모아 뒀어요.')));
+    wrap.append(h('div',{class:'topbar'},h('h1',null,'학종 가이드'),IV.searchBtn()),h('div',{class:'hello'},h('p',{class:'muted',style:'margin:0 0 16px'},'대학별 면접 평가 방식과 기출 질문을 모아 뒀어요.')));
     wrap.append(h('div',{class:'group-h'},'대학별 가이드'));
     const list=h('div',{class:'list'});
     window.GUIDE.forEach(u=>list.append(h('button',{class:'row',type:'button',on:{click:()=>{G.view='univ';G.id=u.id;IV.render()}}},

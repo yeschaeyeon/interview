@@ -3,7 +3,7 @@
 'use strict';
 const IV=window.IV,h=IV.h,D=IV.DATA,S=IV.S;
 const main=document.getElementById('main');
-const V=IV.V={tab:'mat',mat:{view:'home',grade:1,subject:'',eid:null,rtab:'mat',pane:'mat',mask:false},refs:{g:0,k:'전체',q:''},mock:{view:'setup',rid:null},guide:{view:'list',id:null}};
+const V=IV.V={tab:'mat',mat:{view:'home',grade:1,subject:'',eid:null,rtab:'mat',pane:'mat',mask:false},refs:{g:0,k:'전체',q:''},mock:{view:'setup',rid:null},guide:{view:'list',id:null},search:{q:'',from:'mat'},doc:{}};
 const GROUPS=[['창체','창의적 체험활동'],['교과','교과 · 학교자율과정']];
 const IMPTXT={1:'낮음',2:'보통',3:'높음'};
 const impDots=n=>h('span',{class:'imp','data-v':n,title:'중요도 '+n},h('i'),h('i'),h('i'));
@@ -13,14 +13,15 @@ const chevron=()=>h('span',{class:'chev','aria-hidden':'true'},'›');
 IV.render=function render(){
     main.classList.remove('fill');IV.clear(main);main.scrollTop=0;
   if(IV.releaseAudio)IV.releaseAudio();
-  if(V.tab==='mat')renderMat();else if(V.tab==='guide')IV.renderGuide(main,V);else IV.renderMock(main,V);
+  if(V.tab==='mat')renderMat();else if(V.tab==='guide')IV.renderGuide(main,V);else if(V.tab==='search')IV.renderSearch(main,V);else if(V.tab==='doc')IV.renderDoc(main,V);else IV.renderMock(main,V);
 };
 document.getElementById('nav-mat').addEventListener('click',()=>{if(V.tab==='mat'&&V.mat.view==='home')return;V.tab='mat';V.mat.view='home';IV.render()});
 document.getElementById('nav-guide').addEventListener('click',()=>{if(V.tab==='guide'&&V.guide.view==='list')return;V.tab='guide';V.guide.view='list';IV.render()});
+document.getElementById('nav-doc').addEventListener('click',()=>{if(V.tab==='doc')return;V.tab='doc';IV.render()});
 document.getElementById('nav-mock').addEventListener('click',()=>{if(V.tab==='mock'&&V.mock.view==='setup')return;V.tab='mock';V.mock.view='setup';IV.render()});
 
 function topbar(title,onBack,right){
-  return h('div',{class:'topbar'},onBack?h('button',{class:'back',type:'button','aria-label':'뒤로',on:{click:onBack}},'‹'):null,h('h1',null,title),right||null);
+  return h('div',{class:'topbar'},onBack?h('button',{class:'back',type:'button','aria-label':'뒤로',on:{click:onBack}},'‹'):null,h('h1',null,title),right||null,IV.searchBtn());
 }
 
 function renderMat(){
@@ -36,7 +37,7 @@ function renderMat(){
 /* ---------- 홈 ---------- */
 function matHome(){
   const wrap=h('div',{class:'wrap'});
-  wrap.append(h('div',{class:'hello'},h('h2',null,'면접 자료'),h('p',{class:'muted',style:'margin:0 0 16px'},'학년을 고르면 과목이 나오고, 과목을 고르면 생기부 원문과 면접 준비 자료를 나란히 볼 수 있어요.')));
+  wrap.append(h('div',{class:'topbar'},h('h1',null,'면접 자료'),IV.searchBtn()),h('div',{class:'hello'},h('p',{class:'muted',style:'margin:0 0 16px'},'학년을 고르면 과목이 나오고, 과목을 고르면 생기부 원문과 면접 준비 자료를 나란히 볼 수 있어요.')));
   const tiles=h('div',{class:'tiles'});
   for(const g of[1,2,3]){
     const es=D.filter(e=>e.grade===g);const subj=new Set(es.map(e=>e.subject));
@@ -48,7 +49,7 @@ function matHome(){
   tiles.append(h('button',{class:'tile ref',type:'button',on:{click:()=>{V.mat.view='refs';IV.render()}}},
     h('span',{class:'big'},'참고자료'),h('span',{class:'sub'},'책 · 논문 · 기사 등 생기부에 들어간 자료'),h('span',{class:'sub'},`${nref}건`)));
   tiles.append(h('button',{class:'tile',type:'button',on:{click:()=>{V.mat.view='intro';IV.render()}}},
-    h('span',{class:'big'},'자기소개'),h('span',{class:'sub'},'면접 첫 질문 · 직접 쓰고 외우기'),h('span',{class:'sub'},(S.intro.main||'').trim()?`${(S.intro.main||'').replace(/\s/g,'').length}자 작성됨`:'아직 작성 전')));
+    h('span',{class:'big'},'자기소개'),h('span',{class:'sub'},'대학별 2개 · 직접 쓰고 외우기'),h('span',{class:'sub'},(()=>{const n=INTRO_U().filter(u=>(S.intro[u.id]||'').trim()).length;return n?`${n}/2개 대학 작성됨`:'아직 작성 전'})())));
   wrap.append(tiles);
   const sy=IV.sync;
   wrap.append(h('div',{class:'group-h'},'기기 동기화'),h('button',{class:'row',type:'button',style:'border:var(--bd)',on:{click:()=>{V.mat.view='sync';IV.render()}}},
@@ -195,6 +196,7 @@ function matTab(e){
   if(e.pre.length)f.append(h('div',{class:'memo'},renderBlocks(e.pre,e.id,'pre-')));
   if(!e.secs.length&&!e.images.length)f.append(h('p',{class:'muted'},'정리된 면접 자료가 없어요.'));
   e.secs.forEach(s=>f.append(h('div',{class:'sec'},h('h3',null,`${s.k}. ${s.name}`),renderBlocks(s.blocks,e.id,`s${s.k}-`))));
+  if(e.extra6.length)f.append(h('div',{class:'sec'},h('h3',null,'추가 점검 사항'),h('div',{class:'memo'},renderBlocks(e.extra6,e.id,'x-'))));
   return f;
 }
 function refTab(e){
@@ -279,24 +281,31 @@ function refLibrary(){
   drawList();main.append(wrap);
 }
 
-IV.renderBlocks=renderBlocks;
+IV.renderBlocks=renderBlocks;IV.refIndex=refIndex;
 
-/* ---------- 자기소개 ---------- */
+/* ---------- 자기소개 (대학별) ---------- */
+const INTRO_U=()=>window.GUIDE.map(u=>({id:u.id,name:u.name}));
+IV.introText=()=>INTRO_U().map(u=>{const t=(S.intro[u.id]||'').trim();return t?`[${u.name}]\n${t}`:''}).filter(Boolean).join('\n\n');
 function introView(){
   const M=V.mat,wrap=h('div',{class:'wrap'});
+  if(S.intro.main&&!S.intro.ssu){S.intro.ssu=S.intro.main;IV.touch('intro','ssu')}
+  M.introU=M.introU||INTRO_U()[0].id;
   wrap.append(topbar('자기소개',()=>{M.view='home';IV.render()}));
+  const seg=h('div',{class:'seg',role:'group','aria-label':'대학 선택',style:'margin-bottom:12px'},INTRO_U().map(u=>h('button',{type:'button','aria-pressed':M.introU===u.id,on:{click:()=>{M.introU=u.id;IV.render()}}},u.name+((S.intro[u.id]||'').trim()?'':' (작성 전)'))));
+  wrap.append(seg);
+  const U=M.introU,uname=INTRO_U().find(u=>u.id===U).name;
   const box=h('div',{class:'panel hl-scope'});
   function view(){
     IV.clear(box);
-    const t=(S.intro.main||'').trim();
+    const t=(S.intro[U]||'').trim();
     if(t){
       const n=t.replace(/\s/g,'').length;
-      box.append(h('p',{class:'muted small',style:'margin:0 0 10px'},`${n}자 · 말하기 약 ${IV.fmt(n/5*1000)}`));
+      box.append(h('p',{class:'muted small',style:'margin:0 0 10px'},`${uname} · ${n}자 · 말하기 약 ${IV.fmt(n/5*1000)}`));
       const body=h('div',{class:'src'});
-      t.split(/\n+/).filter(x=>x.trim()).forEach((p,i)=>body.append(IV.leaf('p',p.trim(),`intro:${i}`)));
+      t.split(/\n+/).filter(x=>x.trim()).forEach((p,i)=>body.append(IV.leaf('p',p.trim(),`intro:${U}:${i}`)));
       box.append(body,h('button',{class:'btn sm',type:'button',on:{click:edit}},'수정'));
     }else{
-      box.append(h('div',{class:'callout'},h('b',null,'자기소개를 써 보세요'),h('span',{class:'muted'},'모의면접의 첫 화면이 자기소개예요. 여기 쓴 글은 리포트에서 모범답변으로 같이 보여요.')),
+      box.append(h('div',{class:'callout'},h('b',null,`${uname} 자기소개를 써 보세요`),h('span',{class:'muted'},'대학마다 따로 쓸 수 있어요. 모의면접의 첫 화면은 자기소개이고, 여기 쓴 글은 리포트에 함께 보여요.')),
         h('p',{class:'muted small'},'구성 예시'),
         h('p',{class:'muted',style:'margin:0 0 12px;white-space:pre-line'},'① 한 줄 소개와 지원 동기\n② 진로를 탐색한 핵심 활동\n③ 그 활동에서 배운 점\n④ 대학에서의 포부'),
         h('button',{class:'btn primary',type:'button',on:{click:edit}},'쓰기'));
@@ -304,12 +313,12 @@ function introView(){
   }
   function edit(){
     IV.clear(box);
-    const ta=h('textarea',{class:'src-edit',id:'intro-edit','aria-label':'자기소개',style:'min-height:50vh',value:S.intro.main||''});
+    const ta=h('textarea',{class:'src-edit',id:'intro-edit','aria-label':uname+' 자기소개',style:'min-height:50vh',value:S.intro[U]||''});
     const cnt=h('span',{class:'muted small'});
     const upd=()=>{const n=ta.value.replace(/\s/g,'').length;cnt.textContent=`${n}자 · 말하기 약 ${IV.fmt(n/5*1000)}`};
     ta.addEventListener('input',upd);
     box.append(ta,h('div',{style:'display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap'},
-      h('button',{class:'btn primary',type:'button',on:{click:()=>{const v=ta.value.trim();if(v!==(S.intro.main||'').trim())IV.clearHLPrefix('intro:');if(v)S.intro.main=v;else delete S.intro.main;IV.touch('intro','main');view();IV.toast('저장했어요')}}},'저장'),
+      h('button',{class:'btn primary',type:'button',on:{click:()=>{const v=ta.value.trim();if(v!==(S.intro[U]||'').trim())IV.clearHLPrefix(`intro:${U}:`);if(v)S.intro[U]=v;else delete S.intro[U];IV.touch('intro',U);IV.render();IV.toast('저장했어요')}}},'저장'),
       h('button',{class:'btn',type:'button',on:{click:view}},'취소'),cnt));
     upd();ta.focus();
   }
@@ -317,14 +326,6 @@ function introView(){
 }
 
 /* ---------- 동기화 설정 ---------- */
-const RULES=`rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /sync/{doc} {
-      allow get, create, update, delete: if true;
-    }
-  }
-}`;
 function copy(txt,msg){try{navigator.clipboard.writeText(txt).then(()=>IV.toast(msg||'복사했어요'),()=>IV.toast('복사하지 못했어요. 직접 선택해서 복사해 주세요.'))}catch(e){IV.toast('복사하지 못했어요. 직접 선택해서 복사해 주세요.')}}
 function syncView(){
   const M=V.mat,sy=IV.sync,wrap=h('div',{class:'wrap'});
@@ -337,14 +338,14 @@ function syncView(){
     if(st.state==='error'&&st.msg)stat.append(h('br'),st.msg);
   }
   sy.on(paintStat);
-  const kI=h('input',{class:'search',id:'sy-k',placeholder:'apiKey (AIza로 시작)',value:sy.cfg.k||'','aria-label':'apiKey',autocomplete:'off'});
-  const pI=h('input',{class:'search',id:'sy-p',placeholder:'projectId',value:sy.cfg.p||'','aria-label':'projectId',autocomplete:'off'});
-  const cI=h('input',{class:'search',id:'sy-c',placeholder:'동기화 코드',value:sy.cfg.c||'','aria-label':'동기화 코드',autocomplete:'off'});
+  const oI=h('input',{class:'search',id:'sy-o',placeholder:'GitHub 아이디 (예: yeschaeyeon)',value:sy.cfg.o||'','aria-label':'GitHub 아이디',autocomplete:'off'});
+  const rI=h('input',{class:'search',id:'sy-r',placeholder:'데이터 저장소 이름 (예: interview-data)',value:sy.cfg.r||'','aria-label':'저장소 이름',autocomplete:'off'});
+  const tI=h('input',{class:'search',id:'sy-t',type:'password',placeholder:'토큰 (github_pat_로 시작)',value:sy.cfg.t||'','aria-label':'토큰',autocomplete:'off'});
   const pk=h('input',{class:'search',id:'sy-pack',placeholder:'다른 기기에서 복사한 연결 정보 붙여넣기','aria-label':'연결 정보',autocomplete:'off'});
   const connect=()=>{
-    const k=kI.value.trim(),p=pI.value.trim(),c=cI.value.trim().replace(/[^A-Za-z0-9]/g,'');
-    if(!k||!p||!c){IV.toast('apiKey, projectId, 동기화 코드를 모두 입력해 주세요.');return}
-    sy.setCfg({k,p,c});IV.toast('연결했어요. 동기화를 시작해요.');sy.run(true);sy.init();paintStat(sy.st);
+    const o=oI.value.trim(),r=rI.value.trim(),t=tI.value.trim();
+    if(!o||!r||!t){IV.toast('아이디, 저장소 이름, 토큰을 모두 입력해 주세요.');return}
+    sy.setCfg({o,r,t});IV.toast('연결했어요. 동기화를 시작해요.');sy.run(true);sy.init();paintStat(sy.st);
   };
   wrap.append(h('div',{class:'panel'},h('h2',null,'상태'),stat,
     h('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},
@@ -353,24 +354,20 @@ function syncView(){
       h('button',{class:'btn danger',type:'button',disabled:!sy.enabled(),on:{click:()=>IV.modal({title:'동기화를 끌까요?',body:'이 기기의 데이터는 그대로 남아요.',ok:'끄기',danger:true,onOk:()=>{sy.clear();IV.render()}})}},'연결 해제'))));
   wrap.append(h('div',{class:'panel'},h('h2',null,'이미 다른 기기에서 설정했다면'),
     h('p',{class:'muted small',style:'margin:0 0 8px'},'그 기기의 "연결 정보 복사"로 복사한 값을 붙여넣으세요.'),pk,
-    h('button',{class:'btn',type:'button',style:'margin-top:8px',on:{click:()=>{try{const o=sy.unpack(pk.value);kI.value=o.k;pI.value=o.p;cI.value=o.c;connect()}catch(e){IV.toast('연결 정보를 읽을 수 없어요. 다시 복사해 주세요.')}}}},'적용')));
+    h('button',{class:'btn',type:'button',style:'margin-top:8px',on:{click:()=>{try{const o=sy.unpack(pk.value);oI.value=o.o;rI.value=o.r;tI.value=o.t;connect()}catch(e){IV.toast('연결 정보를 읽을 수 없어요. 다시 복사해 주세요.')}}}},'적용')));
   const steps=[
-   ['Firebase 프로젝트 만들기','console.firebase.google.com 에서 "프로젝트 추가"를 누르고 이름을 정해요. Google 애널리틱스는 꺼도 돼요.'],
-   ['Firestore 만들기','왼쪽 메뉴 빌드 → Firestore Database → 데이터베이스 만들기. 위치는 asia-northeast3(서울)을 고르고, 모드는 프로덕션 모드로 시작해요.'],
-   ['규칙 게시','Firestore의 "규칙" 탭에 아래 내용을 통째로 붙여넣고 "게시"를 눌러요.'],
-   ['웹 앱 등록','프로젝트 설정(톱니바퀴) → 일반 → 내 앱 → 웹(</>) 앱을 등록하면 firebaseConfig가 나와요. 그중 apiKey와 projectId를 아래에 입력해요.'],
-   ['동기화 코드','"새 코드 만들기"를 누르거나 직접 정해요. 이 코드를 아는 기기만 같은 데이터를 읽고 써요. 다른 사람에게 알려주지 마세요.']];
-  wrap.append(h('div',{class:'panel'},h('h2',null,'설정 방법'),
-    ...steps.map((st,i)=>h('div',{class:'use',style:i?'':'border-top:0;margin-top:0;padding-top:0'},h('b',null,`${'①②③④⑤'[i]} ${st[0]}`),h('p',{class:'muted small'},st[1]))),
-    h('pre',{style:'border:1px solid var(--line);background:var(--faint);padding:10px;overflow:auto;font-size:12.5px;margin:8px 0'},RULES),
-    h('button',{class:'btn sm',type:'button',on:{click:()=>copy(RULES,'규칙을 복사했어요')}},'규칙 복사')));
+   ['데이터 저장소 만들기','GitHub에서 New repository → 이름은 interview-data 처럼 정하고 반드시 Private(비공개)로 만들어요. 사이트 저장소와는 별개예요.'],
+   ['토큰 만들기','GitHub 프로필 → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token. Repository access는 "Only select repositories"에서 방금 만든 저장소만 고르고, Permissions → Contents를 "Read and write"로 설정해요. 만료 기간은 가장 길게 두세요.'],
+   ['여기에 입력','GitHub 아이디, 저장소 이름, 토큰을 아래에 입력하고 "연결하고 동기화"를 눌러요. 토큰은 이 기기 브라우저에만 저장돼요.'],
+   ['다른 기기','첫 기기에서 "연결 정보 복사"를 누르고, 다른 기기에서 붙여넣어 "적용"하면 끝이에요.']];
+  wrap.append(h('div',{class:'panel'},h('h2',null,'설정 방법 (Firebase 없이 GitHub만 사용)'),
+    ...steps.map((st,i)=>h('div',{class:'use',style:i?'':'border-top:0;margin-top:0;padding-top:0'},h('b',null,`${'①②③④'[i]} ${st[0]}`),h('p',{class:'muted small'},st[1])))));
   wrap.append(h('div',{class:'panel'},h('h2',null,'연결 입력'),
-    h('div',{style:'display:flex;flex-direction:column;gap:8px'},kI,pI,cI),
+    h('div',{style:'display:flex;flex-direction:column;gap:8px'},oI,rI,tI),
     h('div',{style:'display:flex;gap:8px;margin-top:10px;flex-wrap:wrap'},
-      h('button',{class:'btn',type:'button',on:{click:()=>{cI.value=sy.makeCode()}}},'새 코드 만들기'),
       h('button',{class:'btn primary',type:'button',on:{click:connect}},'연결하고 동기화'))));
   wrap.append(h('div',{class:'panel'},h('h2',null,'동기화되는 것'),
-    h('p',{style:'margin:0;white-space:pre-line'},'① 하이라이트, 중요도, 완료 표시, 생기부 원문, 자기소개, 가이드 메모\n② 모의면접 리포트(질문, 시간, 별점)\n③ 녹음과 첨부 영상은 용량 때문에 동기화되지 않고, 녹음한 기기에서만 재생돼요.')));
+    h('p',{style:'margin:0;white-space:pre-line'},'① 하이라이트, 중요도, 완료 표시, 생기부 원문, 자기소개, 가이드 메모\n② 모의면접 리포트(질문, 시간, 별점)\n③ 녹음과 첨부 영상은 용량 때문에 동기화되지 않고, 녹음한 기기에서만 재생돼요.\n④ 토큰은 비밀번호예요. 사이트 저장소나 공개 장소에 올리지 마세요.')));
   paintStat(sy.st);main.append(wrap);
 }
 

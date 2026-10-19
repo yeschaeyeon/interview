@@ -179,7 +179,7 @@ function draw(){
 }
 function leaveIntro(){
   const it=SS.intro;const spent=performance.now()-it.t;
-  SS.records.push({kind:'intro',entryId:null,tag:'자기소개',q:'자기소개',a:(S.intro.main||''),f:'',status:it.slot.blob?'answered':'skipped',spentMs:spent,recMs:it.slot.recMs||0,blob:it.slot.blob||null});
+  SS.records.push({kind:'intro',entryId:null,tag:'자기소개',q:'자기소개',a:IV.introText(),f:'',status:it.slot.blob?'answered':'skipped',spentMs:spent,recMs:it.slot.recMs||0,blob:it.slot.blob||null});
 }
 function askEnd(){
   IV.modal({title:'면접을 종료할까요?',body:'지금까지의 답변으로 리포트를 만들어요.',ok:'종료',cancel:'계속하기',danger:true,onOk:endSession});

@@ -8,13 +8,16 @@ GitHub Pages에 올리거나 폴더째 로컬 서버로 열면 됩니다. (녹�
 - 자료 수정: `data.js`(docx에서 변환한 데이터)
 
 
-## 기기 동기화 (Firebase)
-① console.firebase.google.com 에서 프로젝트 생성
-② Firestore Database 만들기 (서울, 프로덕션 모드)
-③ 규칙 탭에 앱 안의 "자료 > 기기 동기화"에 있는 규칙을 붙여넣고 게시
-④ 웹 앱 등록 후 apiKey, projectId 확인
-⑤ 앱에서 입력하고 "새 코드 만들기" → 연결. 다른 기기는 "연결 정보 복사"로 붙여넣기
-※ 녹음/영상은 동기화되지 않습니다.
+## 기기 동기화 (GitHub만 사용)
+① GitHub에서 비공개(Private) 저장소를 새로 만든다 (예: interview-data)
+② Settings > Developer settings > Fine-grained token: 그 저장소만 선택, Contents 권한 Read and write
+③ 앱의 "자료 > 기기 동기화"에 아이디, 저장소 이름, 토큰 입력
+④ 다른 기기는 "연결 정보 복사"로 붙여넣기
+※ 데이터는 저장소의 iv-sync/ 폴더에 JSON으로 저장됩니다. 녹음/영상은 동기화되지 않습니다.
+※ 토큰은 비밀번호입니다. 사이트 저장소에 넣지 마세요.
+
+## 검색 / 전체 자료
+각 화면 오른쪽 위 돋보기: 글자 단위(공백 무시) 전체 검색. 하단 "전체 자료": A4 문서 보기, PDF 저장(인쇄), HTML 다운로드.
 
 ## 가이드 / 부록
 guidedata.js 의 GUIDE, APPENDIX 배열을 수정하면 대학·부록 내용이 바뀝니다.

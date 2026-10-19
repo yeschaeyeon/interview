@@ -1,28 +1,44 @@
-/* 기기 간 동기화: Firebase Firestore REST (본인 프로젝트). 텍스트 데이터만 동기화, 녹음·영상은 제외 */
+/* 기기 간 동기화: GitHub 저장소(비공개) Contents API. 텍스트 데이터만 동기화, 녹음·영상은 제외 */
 (()=>{
 'use strict';
 const IV=window.IV,S=IV.S;
-const KEY='iv.sync.v1';
+const KEY='iv.sync.gh.v1';
 let cfg={};try{cfg=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}
-const sync=IV.sync={cfg,st:{state:cfg.k?'idle':'off',msg:'',last:cfg.last||0}};
-sync.enabled=()=>!!(cfg.k&&cfg.p&&cfg.c);
+const sync=IV.sync={cfg,preset:false,st:{state:cfg.t?'idle':'off',msg:'',last:cfg.last||0}};
+sync.enabled=()=>!!(cfg.t&&cfg.o&&cfg.r);
 function persist(){cfg.last=sync.st.last;try{localStorage.setItem(KEY,JSON.stringify(cfg))}catch(e){}}
-sync.setCfg=o=>{Object.assign(cfg,o);persist();sync.st.state=sync.enabled()?'idle':'off'};
-sync.clear=()=>{for(const k of['k','p','c','last'])delete cfg[k];sync.st={state:'off',msg:'',last:0};persist()};
-sync.makeCode=()=>{const a='abcdefghijkmnpqrstuvwxyz23456789';return[...crypto.getRandomValues(new Uint8Array(14))].map(b=>a[b%32]).join('')};
-sync.pack=()=>btoa(unescape(encodeURIComponent(JSON.stringify({k:cfg.k,p:cfg.p,c:cfg.c}))));
-sync.unpack=s=>{const o=JSON.parse(decodeURIComponent(escape(atob(s.trim()))));if(!o.k||!o.p||!o.c)throw new Error('x');return o};
+sync.setCfg=o=>{Object.assign(cfg,o);for(const k in shas)delete shas[k];persist();sync.st.state=sync.enabled()?'idle':'off'};
+sync.clear=()=>{for(const k of['t','o','r','last'])delete cfg[k];sync.st={state:'off',msg:'',last:0};persist()};
+sync.pack=()=>btoa(unescape(encodeURIComponent(JSON.stringify({o:cfg.o,r:cfg.r,t:cfg.t}))));
+sync.unpack=s=>{const o=JSON.parse(decodeURIComponent(escape(atob(s.trim()))));if(!o.o||!o.r||!o.t)throw new Error('x');return o};
 
-const base=()=>`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(cfg.p)}/databases/(default)/documents/sync`;
-const url=id=>`${base()}/${encodeURIComponent(cfg.c)}_${id}?key=${encodeURIComponent(cfg.k)}`;
-async function fail(r){let m='';try{m=(await r.json()).error.message}catch(e){}throw new Error(`${r.status} ${m}`.trim())}
-async function getDoc(id){const r=await fetch(url(id));if(r.status===404)return null;if(!r.ok)await fail(r);const j=await r.json();return j.fields&&j.fields.d?JSON.parse(j.fields.d.stringValue):null}
-async function putDoc(id,obj){
-  const body=JSON.stringify({fields:{d:{stringValue:JSON.stringify(obj)}}});
-  if(body.length>900000)throw new Error('데이터가 너무 커서 저장할 수 없어요');
-  const r=await fetch(url(id),{method:'PATCH',headers:{'Content-Type':'application/json'},body});if(!r.ok)await fail(r);
+/* GitHub Contents API: 비공개 저장소의 iv-sync/ 폴더에 JSON 파일로 저장 */
+const shas={};
+const api=id=>`https://api.github.com/repos/${encodeURIComponent(cfg.o)}/${encodeURIComponent(cfg.r)}/contents/iv-sync/${id}.json`;
+const hdr=(extra)=>Object.assign({'Authorization':'Bearer '+cfg.t,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},extra||{});
+const b64=s=>btoa(unescape(encodeURIComponent(s)));
+const unb64=s=>decodeURIComponent(escape(atob(s.replace(/\s/g,''))));
+async function fail(r){let m='';try{m=(await r.json()).message}catch(e){}throw new Error(`${r.status} ${m}`.trim())}
+async function getDoc(id){
+  const r=await fetch(api(id),{headers:hdr(),cache:'no-store'});
+  if(r.status===404){delete shas[id];return null}
+  if(!r.ok)await fail(r);
+  const j=await r.json();shas[id]=j.sha;
+  let txt;
+  if(j.content&&j.encoding==='base64')txt=unb64(j.content);
+  else{const rr=await fetch(api(id),{headers:hdr({'Accept':'application/vnd.github.raw+json'}),cache:'no-store'});if(!rr.ok)await fail(rr);txt=await rr.text()}
+  return JSON.parse(txt);
 }
-async function delDoc(id){try{await fetch(url(id),{method:'DELETE'})}catch(e){}}
+async function freshSha(id){const r=await fetch(api(id),{headers:hdr(),cache:'no-store'});if(r.status===404)return null;if(!r.ok)await fail(r);return(await r.json()).sha}
+async function putDoc(id,obj,retry){
+  const body={message:'sync '+id,content:b64(JSON.stringify(obj))};
+  if(shas[id])body.sha=shas[id];
+  const r=await fetch(api(id),{method:'PUT',headers:hdr({'Content-Type':'application/json'}),body:JSON.stringify(body)});
+  if((r.status===409||r.status===422)&&!retry){shas[id]=await freshSha(id);if(!shas[id])delete shas[id];return putDoc(id,obj,true)}
+  if(!r.ok)await fail(r);
+  const j=await r.json();if(j.content)shas[id]=j.content.sha;
+}
+async function delDoc(id){try{const sha=shas[id]||await freshSha(id);if(!sha)return;await fetch(api(id),{method:'DELETE',headers:hdr({'Content-Type':'application/json'}),body:JSON.stringify({message:'delete '+id,sha})});delete shas[id]}catch(e){}}
 
 function backfill(){for(const sec of IV.SECS)for(const k of Object.keys(S[sec]))if(!S.ts[sec+'|'+k])S.ts[sec+'|'+k]=1}
 function localPayload(){const o={ts:S.ts};for(const sec of IV.SECS)o[sec]=S[sec];return o}
@@ -78,7 +94,8 @@ sync.run=async function(manual){
   }catch(e){
     sync.st.state='error';sync.st.msg=String(e.message||e);
     if(/Failed to fetch|NetworkError/i.test(sync.st.msg))sync.st.msg='인터넷에 연결할 수 없어요. 연결되면 다시 시도해요.';
-    else if(/403|PERMISSION/i.test(sync.st.msg))sync.st.msg='권한 오류예요. Firestore 규칙을 안내대로 게시했는지 확인해 주세요. ('+sync.st.msg+')';
+    else if(/^401/.test(sync.st.msg))sync.st.msg='토큰이 올바르지 않거나 만료됐어요. ('+sync.st.msg+')';
+    else if(/^403|^404/.test(sync.st.msg))sync.st.msg='저장소를 찾을 수 없거나 토큰 권한(Contents 읽기/쓰기)이 부족해요. ('+sync.st.msg+')';
   }finally{
     busy=false;notify();
     if(uiChanged)refreshUI();
@@ -93,13 +110,14 @@ function refreshUI(){
 }
 const listeners=new Set();sync.on=f=>listeners.add(f);
 function notify(){listeners.forEach(f=>f(sync.st))}
-sync.schedule=()=>{if(!sync.enabled())return;clearTimeout(timer);timer=setTimeout(()=>sync.run(),2500)};
+sync.schedule=()=>{if(!sync.enabled())return;clearTimeout(timer);timer=setTimeout(()=>sync.run(),1200)};
 sync.deleteReport=async id=>{S.ridx[id]=-1;S.ts['ridx|'+id]=Date.now();IV.save();if(sync.enabled()){await delDoc('r_'+id);sync.schedule()}};
 sync.init=()=>{
   if(!sync.enabled())return;
   sync.run();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sync.run()});
   addEventListener('online',()=>sync.run());
-  setInterval(()=>{if(document.visibilityState==='visible')sync.run()},60000);
+  addEventListener('pagehide',()=>{if(S.ts)sync.run()});
+  setInterval(()=>{if(document.visibilityState==='visible')sync.run()},20000);
 };
 })();
