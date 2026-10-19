@@ -4,7 +4,7 @@
 const IV=window.IV,h=IV.h,D=IV.DATA,S=IV.S;
 const WEIGHT={3:5,2:3,1:1};
 const sess=document.getElementById('session');
-const cfg={imps:new Set([1,2,3]),off:new Set(),nq:5,detail:false};
+const cfg={imps:new Set([1,2,3]),off:new Set(),nq:5,detail:false,cshuffle:false,cintro:false};
 let urls=[];
 IV.releaseAudio=()=>{urls.forEach(u=>URL.revokeObjectURL(u));urls=[]};
 const interviewable=D.filter(e=>e.qs.length);
@@ -12,13 +12,78 @@ const interviewable=D.filter(e=>e.qs.length);
 IV.renderMock=function(main,V){
   const M=V.mock;
   if(M.view==='setup')return setup(main,V);
+  if(M.view==='custom')return customList(main,V);
+  if(M.view==='cedit')return customEdit(main,V);
   if(M.view==='reports')return reportList(main,V);
   if(M.view==='report')return reportDetail(main,V);
 };
 function mockTabs(V,cur){
+  const on=v=>cur===v||(v==='custom'&&cur==='cedit')||(v==='reports'&&cur==='report');
+  const go=(v)=>()=>{V.mock.view=v;IV.render()};
   return h('div',{class:'seg',role:'tablist',style:'margin-bottom:14px'},
-    h('button',{type:'button','aria-pressed':cur==='setup',on:{click:()=>{V.mock.view='setup';IV.render()}}},'면접 시작'),
-    h('button',{type:'button','aria-pressed':cur!=='setup',on:{click:()=>{V.mock.view='reports';IV.render()}}},'리포트'));
+    h('button',{type:'button','aria-pressed':on('setup'),on:{click:go('setup')}},'면접 시작'),
+    h('button',{type:'button','aria-pressed':on('custom'),on:{click:go('custom')}},'모의면접 만들기'),
+    h('button',{type:'button','aria-pressed':on('reports'),on:{click:go('reports')}},'리포트'));
+}
+
+/* ---------- 모의면접 만들기 (직접 질문 입력) ---------- */
+const sets=()=>Object.entries(S.sets).map(([id,s])=>({id,...s})).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+function customList(main,V){
+  const wrap=h('div',{class:'wrap'});wrap.append(mockTabs(V,'custom'));
+  wrap.append(h('p',{class:'muted',style:'margin:0 0 12px'},'내가 직접 질문을 적어서 나만의 모의면접을 만들어요. 만든 면접은 기기 동기화에도 포함돼요.'));
+  wrap.append(h('button',{class:'btn primary',type:'button',style:'margin-bottom:14px',on:{click:()=>{const id='s'+Date.now();S.sets[id]={name:'',qs:[{q:'',a:''}],updatedAt:Date.now()};V.mock.sid=id;V.mock.view='cedit';IV.render()}}},'+ 새 모의면접 만들기'));
+  const opts=h('div',{class:'panel'},h('h2',null,'진행 옵션'),
+    h('label',{style:'display:flex;gap:8px;align-items:center;margin-bottom:6px'},h('input',{type:'checkbox',id:'c-shuf',checked:cfg.cshuffle,on:{change:ev=>{cfg.cshuffle=ev.target.checked}}}),'질문 순서 섞기'),
+    h('label',{style:'display:flex;gap:8px;align-items:center'},h('input',{type:'checkbox',id:'c-intro',checked:cfg.cintro,on:{change:ev=>{cfg.cintro=ev.target.checked}}}),'자기소개부터 시작'));
+  const list=sets();
+  if(!list.length){wrap.append(h('div',{class:'empty'},'아직 만든 모의면접이 없어요. 위 버튼으로 질문을 입력해 보세요.'));main.append(wrap);return}
+  wrap.append(opts);
+  list.forEach(s=>{
+    const n=s.qs.filter(x=>x.q.trim()).length;
+    wrap.append(h('div',{class:'panel'},h('b',null,s.name||'(이름 없음)'),h('div',{class:'muted small',style:'margin:2px 0 10px'},`질문 ${n}개`),
+      h('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},
+        h('button',{class:'btn primary',type:'button',disabled:!n,on:{click:()=>startCustom(s)}},'시작'),
+        h('button',{class:'btn',type:'button',on:{click:()=>{V.mock.sid=s.id;V.mock.view='cedit';IV.render()}}},'수정'),
+        h('button',{class:'btn danger',type:'button',on:{click:()=>IV.modal({title:'이 모의면접을 삭제할까요?',body:s.name||'(이름 없음)',ok:'삭제',danger:true,onOk:()=>{delete S.sets[s.id];IV.touch('sets',s.id);IV.render()}})}},'삭제'))));
+  });
+  main.append(wrap);
+}
+function customEdit(main,V){
+  const id=V.mock.sid,s=S.sets[id];
+  const wrap=h('div',{class:'wrap'});
+  if(!s){V.mock.view='custom';return customList(main,V)}
+  wrap.append(h('div',{class:'topbar'},h('button',{class:'back',type:'button','aria-label':'목록',on:{click:()=>{if(!s.name.trim()&&!s.qs.some(x=>x.q.trim())){delete S.sets[id];IV.touch('sets',id)}V.mock.view='custom';IV.render()}}},'‹'),h('h1',null,'모의면접 만들기')));
+  let t=null;const save=()=>{clearTimeout(t);t=setTimeout(()=>{s.updatedAt=Date.now();IV.touch('sets',id)},400)};
+  const nameI=h('input',{class:'search',id:'c-name',placeholder:'면접 이름 (예: 숭실대 경영 예상 질문)','aria-label':'면접 이름',value:s.name,on:{input:()=>{s.name=nameI.value;save()}}});
+  wrap.append(h('div',{class:'panel'},h('h2',null,'이름'),nameI));
+  const box=h('div');wrap.append(box);
+  function draw(){
+    IV.clear(box);
+    s.qs.forEach((x,i)=>{
+      const q=h('textarea',{class:'src-edit',style:'min-height:70px',placeholder:'질문을 입력하세요','aria-label':`질문 ${i+1}`,value:x.q,on:{input:()=>{x.q=q.value;save()}}});
+      const a=h('textarea',{class:'src-edit',style:'min-height:60px;margin-top:6px',placeholder:'모범답변·메모 (선택) — 리포트에 함께 보여요','aria-label':`질문 ${i+1} 모범답변`,value:x.a||'',on:{input:()=>{x.a=a.value;save()}}});
+      const mv=d=>()=>{const j=i+d;if(j<0||j>=s.qs.length)return;[s.qs[i],s.qs[j]]=[s.qs[j],s.qs[i]];save();draw()};
+      box.append(h('div',{class:'panel'},h('div',{style:'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px'},h('b',null,'Q'+(i+1)),
+        h('div',{style:'display:flex;gap:6px'},h('button',{class:'btn sm',type:'button','aria-label':'위로',disabled:i===0,on:{click:mv(-1)}},'↑'),h('button',{class:'btn sm',type:'button','aria-label':'아래로',disabled:i===s.qs.length-1,on:{click:mv(1)}},'↓'),
+          h('button',{class:'btn sm danger',type:'button',on:{click:()=>{s.qs.splice(i,1);if(!s.qs.length)s.qs.push({q:'',a:''});save();draw()}}},'삭제'))),q,a));
+    });
+  }
+  draw();
+  const bulk=h('textarea',{class:'src-edit',id:'c-bulk',style:'min-height:90px',placeholder:'여러 질문을 한꺼번에 붙여넣기 — 한 줄에 질문 하나','aria-label':'질문 여러 개 붙여넣기'});
+  wrap.append(h('div',{style:'display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px'},h('button',{class:'btn',type:'button',on:{click:()=>{s.qs.push({q:'',a:''});save();draw();const ts=box.querySelectorAll('textarea');ts[ts.length-2].focus()}}},'+ 질문 추가')),
+    h('div',{class:'panel'},h('h2',null,'여러 개 한꺼번에 추가'),bulk,h('button',{class:'btn',type:'button',style:'margin-top:8px',on:{click:()=>{
+      const lines=bulk.value.split(/\n+/).map(x=>x.replace(/^\s*(?:Q?\d+[.)]|[①-⑳]|[-•·])\s*/,'').trim()).filter(Boolean);
+      if(!lines.length){IV.toast('추가할 질문이 없어요.');return}
+      s.qs=s.qs.filter(x=>x.q.trim()||(x.a||'').trim());lines.forEach(l=>s.qs.push({q:l,a:''}));bulk.value='';save();draw();IV.toast(lines.length+'개 추가했어요')}}},'추가')));
+  wrap.append(h('div',{class:'startbar'},h('button',{class:'btn primary',type:'button',on:{click:()=>{clearTimeout(t);s.name=s.name.trim();s.qs=s.qs.filter(x=>x.q.trim()||(x.a||'').trim());if(!s.qs.length)s.qs.push({q:'',a:''});s.updatedAt=Date.now();IV.touch('sets',id);V.mock.view='custom';IV.render();IV.toast('저장했어요')}}},'저장하고 목록으로')));
+  main.append(wrap);
+}
+function startCustom(s){
+  const qs=s.qs.filter(x=>x.q.trim());if(!qs.length)return;
+  SS={t0:performance.now(),pool:[],nq:99,deck:[],last:null,records:[],imps:[],custom:{name:s.name||'직접 만든 면접',qs:cfg.cshuffle?IV.shuffle(qs):qs},phase:cfg.cintro?'intro':'round',intro:{slot:{},spent:0,t:performance.now()},round:null};
+  if(SS.phase==='round')nextEntry();
+  sess.hidden=false;document.body.style.overflow='hidden';
+  clearInterval(tickT);tickT=setInterval(tick,250);draw();
 }
 
 /* ---------- 설정 ---------- */
@@ -110,6 +175,7 @@ function tick(){
   sess.querySelectorAll('[data-rec-live]').forEach(el=>{if(a&&a.slot===el._slot)el.textContent='■ 정지 '+IV.fmt(performance.now()-a.t0)});
 }
 function nextEntry(){
+  if(SS.custom){SS.round={e:{id:null,custom:true,name:SS.custom.name},items:SS.custom.qs.map(x=>({q:{q:x.q.trim(),a:(x.a||'').trim(),f:''},slot:{},spent:0,status:null,visited:false,t:null})),idx:0};enter(0);return}
   if(!SS.deck.length)SS.deck=buildDeck(SS.pool,SS.last);
   const e=SS.deck.shift();SS.last=e;
   const qs=IV.shuffle(e.qs).slice(0,SS.nq).map(q=>({q,slot:{},spent:0,status:null,visited:false,t:null}));
@@ -125,7 +191,7 @@ function finalizeRound(){
   if(r.idx<r.items.length)leave(r.idx);
   r.items.forEach(it=>{
     if(!(it.visited||it.slot.blob))return;
-    SS.records.push({kind:'q',entryId:r.e.id,tag:IV.label(r.e),q:it.q.q,a:it.q.a,f:it.q.f,status:it.status||'answered',spentMs:it.spent,recMs:it.slot.recMs||0,blob:it.slot.blob||null});
+    SS.records.push({kind:'q',entryId:r.e.id,tag:r.e.custom?('직접 만든 면접 · '+r.e.name):IV.label(r.e),q:it.q.q,a:it.q.a,f:it.q.f,status:it.status||'answered',spentMs:it.spent,recMs:it.slot.recMs||0,blob:it.slot.blob||null});
   });
   SS.round=null;
 }
@@ -173,7 +239,7 @@ function draw(){
     }
     body.append(list);
     foot=h('div',{class:'s-foot'},h('span',{class:'muted small'},`지금까지 ${SS.records.length+r.items.filter(x=>x.visited).length}문항`),
-      h('button',{class:'btn primary',type:'button',on:{click:async()=>{await stopRec();finalizeRound();nextEntry();draw();body.scrollTop=0}}},'다음'));
+      h('button',{class:'btn primary',type:'button',on:{click:async()=>{await stopRec();if(SS.custom){endSession();return}finalizeRound();nextEntry();draw();body.scrollTop=0}}},SS.custom?'면접 마치기':'다음'));
   }
   sess.append(top,body);if(foot)sess.append(foot);
 }
@@ -190,6 +256,7 @@ async function endSession(){
   const total=performance.now()-SS.t0;
   const answered=SS.records.filter(r=>r.blob||r.status!=='skipped'||r.kind==='q');
   const rep={id:'r'+Date.now(),createdAt:Date.now(),totalMs:total,rating:0,updatedAt:Date.now(),imps:SS.imps,records:SS.records};
+  if(SS.custom)rep.setName=SS.custom.name;
   clearInterval(tickT);SS=null;sess.hidden=true;IV.clear(sess);document.body.style.overflow='';
   if(!rep.records.length){IV.toast('답변한 질문이 없어서 리포트를 만들지 않았어요.');IV.V.mock.view='setup';IV.render();return}
   try{await IV.reports.put(rep)}catch(e){IV.toast('리포트를 저장하지 못했어요.')}
@@ -215,7 +282,7 @@ async function reportList(main,V){
       h('div',{class:'rep'},
         h('button',{class:'meta',type:'button',style:'border:0;background:none;text-align:left;padding:0',on:{click:()=>{V.mock.view='report';V.mock.rid=rep.id;V.mock.cache=rep;IV.render()}}},
           h('b',null,IV.fmtDate(rep.createdAt)),
-          h('div',{class:'muted small'},`총 ${IV.fmt(rep.totalMs)} · ${rep.records.length}문항`),
+          h('div',{class:'muted small'},`${rep.setName?rep.setName+' · ':''}총 ${IV.fmt(rep.totalMs)} · ${rep.records.length}문항`),
           h('div',{class:'stat'},(rep.videos&&rep.videos.length)?h('span',{class:'st'},'영상 '+rep.videos.length):null,c.answered?h('span',{class:'st answered'},'답변 '+c.answered):null,c.gaveup?h('span',{class:'st gaveup'},'포기 '+c.gaveup):null,c.skipped?h('span',{class:'st skipped'},'넘김 '+c.skipped):null)),
         stars(rep),
         h('button',{class:'btn sm danger',type:'button',on:{click:()=>IV.modal({title:'리포트를 삭제할까요?',body:IV.fmtDate(rep.createdAt),ok:'삭제',danger:true,onOk:async()=>{await IV.reports.del(rep.id);await IV.sync.deleteReport(rep.id);IV.render()}})}},'삭제')));

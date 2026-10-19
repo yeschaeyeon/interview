@@ -28,6 +28,7 @@ function build(){
     u.secs.forEach(s=>{add('가이드 · '+u.name,s.t,s.t,go);s.b.forEach(b=>{if(b.t==='table')b.rows.forEach(r=>add('가이드 · '+u.name,s.t,r.join(' · '),go));else if(b.t==='ol')b.x.forEach(x=>add('가이드 · '+u.name,s.t,x,go));else add('가이드 · '+u.name,s.t,b.x,go)})});
     const n=S.notes['u:'+u.id];if(n)n.split(/\n+/).forEach(t=>add('가이드 · '+u.name,'내 메모',t,go));
   });
+  Object.entries(S.sets).forEach(([id,st])=>{const go=()=>{IV.V.tab='mock';IV.V.mock.view='cedit';IV.V.mock.sid=id;IV.render()};add('직접 만든 면접',st.name||'(이름 없음)',st.name,go);(st.qs||[]).forEach((x,i)=>{add('직접 만든 면접 · '+(st.name||''),`Q${i+1}`,x.q,go);add('직접 만든 면접 · '+(st.name||''),`Q${i+1} · 답변`,x.a,go)})});
   window.APPENDIX.forEach(a=>{
     const go=()=>{IV.V.tab='guide';IV.V.guide.view='appx';IV.V.guide.id=a.id;IV.render()};
     add('부록 · '+a.name,'소개',a.desc,go);

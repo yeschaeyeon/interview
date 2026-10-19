@@ -42,8 +42,8 @@ IV.modal=function({title,body,ok='확인',cancel='취소',danger=false,onOk}){
 
 /* ---------- 상태 저장 (localStorage) ---------- */
 const LS='iv.state.v1';
-const SECS=['imp','src','hl','done','intro','notes','ridx'];
-const S=IV.S={imp:{},src:{},hl:{},done:{},intro:{},notes:{},ridx:{},ts:{}};
+const SECS=['imp','src','hl','done','intro','notes','ridx','sets'];
+const S=IV.S={imp:{},src:{},hl:{},done:{},intro:{},notes:{},ridx:{},sets:{},ts:{}};
 try{const o=JSON.parse(localStorage.getItem(LS)||'{}');for(const k of[...SECS,'ts'])if(o[k])S[k]=o[k]}catch(e){}
 let st;
 IV.save=()=>{clearTimeout(st);st=setTimeout(()=>{try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}},120)};
